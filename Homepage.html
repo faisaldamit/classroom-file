@@ -280,7 +280,7 @@
       addBtn.focus();
     }
 
-    function addCard({ name, file }) {
+    function addCard({ name, blob }) {
       const card = document.createElement('section');
       card.className = 'card';
 
@@ -290,9 +290,11 @@
       const img = document.createElement('img');
       img.alt = name ? `${name}'s photo` : 'Student photo';
 
-      if (file) {
-        const objectUrl = URL.createObjectURL(file);
+      if (blob) {
+        // Create an object URL for display; the actual image data is stored in IndexedDB
+        const objectUrl = URL.createObjectURL(blob);
         img.src = objectUrl;
+        img.dataset.objectUrl = objectUrl;
       } else {
         img.src = placeholderSvg(name || 'Student');
       }
@@ -314,10 +316,19 @@
       setEmptyState();
     }
 
-    function onCreate() {
+    async function onCreate() {
       const name = nameInput.value.trim();
       const file = imgInput.files && imgInput.files[0] ? imgInput.files[0] : null;
-      addCard({ name, file });
+
+      // Persist first (unlimited-ish compared to localStorage)
+      await addCardToDB({
+        name: name || 'Unnamed',
+        imageBlob: file || null,
+        createdAt: Date.now()
+      });
+
+      // Re-render from DB so UI matches stored order
+      await reloadFromDB();
       closeModal();
     }
 
@@ -337,17 +348,78 @@
 
     createBtn.addEventListener('click', onCreate);
 
-    // Start
-    setEmptyState();
+    // ===== IndexedDB Persistence (more storage than localStorage) =====
+    const DB_NAME = 'classroom_db';
+    const DB_VERSION = 1;
+    const STORE = 'cards';
 
-     // Override addCard to also save
-    const originalAddCard = addCard;
-    addCard = function(data) {
-      originalAddCard(data);
-      saveToStorage();
-    };
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) {
+            const os = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+            os.createIndex('createdAt', 'createdAt');
+          }
+        };
+
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function addCardToDB({ name, imageBlob, createdAt }) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const os = tx.objectStore(STORE);
+        const req = os.add({ name, imageBlob, createdAt });
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function getAllCardsFromDB() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const os = tx.objectStore(STORE);
+        const req = os.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    function clearGridAndRevokeUrls() {
+      // Revoke any object URLs we created to avoid memory leaks
+      grid.querySelectorAll('img[data-object-url]').forEach(img => {
+        try { URL.revokeObjectURL(img.dataset.objectUrl); } catch (_) {}
+      });
+      grid.innerHTML = '';
+    }
+
+    async function reloadFromDB() {
+      const cards = await getAllCardsFromDB();
+      // newest first
+      cards.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      clearGridAndRevokeUrls();
+
+      cards.forEach(c => {
+        addCard({ name: c.name, blob: c.imageBlob || null });
+      });
+
+      setEmptyState();
+    }
 
     // Start
+    reloadFromDB();
     loadFromStorage();
     setEmptyState();
   </script>
