@@ -267,10 +267,24 @@
       emptyState.style.display = grid.children.length ? 'none' : 'block';
     }
 
-    function openModal() {
+    let modalMode = 'add';
+    let editingId = null;
+
+    function openModal({ mode = 'add', id = null, name = '' } = {}) {
+      modalMode = mode;
+      editingId = id;
+
       backdrop.style.display = 'flex';
-      nameInput.value = '';
+
+      // Reset inputs
+      nameInput.value = name || '';
       imgInput.value = '';
+
+      // UI text
+      const titleEl = document.getElementById('modalTitle');
+      titleEl.textContent = mode === 'edit' ? 'Edit Card' : 'Add to Classroom';
+      createBtn.textContent = mode === 'edit' ? 'Save changes' : 'Add card';
+
       // focus name for quick entry
       setTimeout(() => nameInput.focus(), 0);
     }
@@ -280,9 +294,10 @@
       addBtn.focus();
     }
 
-    function addCard({ name, blob }) {
+    function addCard({ id, name, blob }) {
       const card = document.createElement('section');
       card.className = 'card';
+      if (typeof id !== 'undefined' && id !== null) card.dataset.id = String(id);
 
       const photo = document.createElement('div');
       photo.className = 'photo';
@@ -300,7 +315,6 @@
       }
 
       img.loading = 'lazy';
-
       photo.appendChild(img);
 
       const title = document.createElement('p');
@@ -311,29 +325,70 @@
       meta.className = 'meta';
       meta.textContent = 'Classroom';
 
-      card.append(photo, title, meta);
+      const actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '10px';
+      actions.style.marginTop = '2px';
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn';
+      editBtn.type = 'button';
+      editBtn.textContent = 'Edit';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn';
+      delBtn.type = 'button';
+      delBtn.textContent = 'Delete';
+
+      editBtn.addEventListener('click', async () => {
+        const cardId = Number(card.dataset.id);
+        const record = await getCardById(cardId);
+        openModal({
+          mode: 'edit',
+          id: cardId,
+          name: record?.name || 'Unnamed'
+        });
+      });
+
+      delBtn.addEventListener('click', async () => {
+        const cardId = Number(card.dataset.id);
+        const ok = confirm(`Delete ${title.textContent || 'this card'}?`);
+        if (!ok) return;
+        await deleteCardFromDB(cardId);
+        await reloadFromDB();
+      });
+
+      actions.append(editBtn, delBtn);
+
+      card.append(photo, title, meta, actions);
       grid.prepend(card);
       setEmptyState();
     }
 
     async function onCreate() {
-      const name = nameInput.value.trim();
+      const name = nameInput.value.trim() || 'Unnamed';
       const file = imgInput.files && imgInput.files[0] ? imgInput.files[0] : null;
 
-      // Persist first (unlimited-ish compared to localStorage)
-      await addCardToDB({
-        name: name || 'Unnamed',
-        imageBlob: file || null,
-        createdAt: Date.now()
-      });
+      if (modalMode === 'edit' && editingId != null) {
+        await updateCardInDB(editingId, {
+          name,
+          // only update image if user selected a new file
+          imageBlob: file ? file : undefined
+        });
+      } else {
+        await addCardToDB({
+          name,
+          imageBlob: file || null,
+          createdAt: Date.now()
+        });
+      }
 
-      // Re-render from DB so UI matches stored order
       await reloadFromDB();
       closeModal();
     }
 
     // Events
-    addBtn.addEventListener('click', openModal);
+    addBtn.addEventListener('click', () => openModal({ mode: 'add' }));
     closeBtn.addEventListener('click', closeModal);
     cancelBtn.addEventListener('click', closeModal);
 
@@ -383,6 +438,55 @@
       });
     }
 
+    async function getCardById(id) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const os = tx.objectStore(STORE);
+        const req = os.get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function updateCardInDB(id, { name, imageBlob }) {
+      const existing = await getCardById(id);
+      if (!existing) return;
+
+      const updated = {
+        ...existing,
+        name: typeof name === 'string' ? name : existing.name,
+        // If imageBlob is undefined, keep existing; if null, clear; if Blob/File, replace
+        imageBlob: typeof imageBlob === 'undefined' ? existing.imageBlob : imageBlob,
+      };
+
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const os = tx.objectStore(STORE);
+        const req = os.put(updated);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function deleteCardFromDB(id) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const os = tx.objectStore(STORE);
+        const req = os.delete(id);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
     async function getAllCardsFromDB() {
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -412,7 +516,7 @@
       clearGridAndRevokeUrls();
 
       cards.forEach(c => {
-        addCard({ name: c.name, blob: c.imageBlob || null });
+        addCard({ id: c.id, name: c.name, blob: c.imageBlob || null });
       });
 
       setEmptyState();
