@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classroom</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --card:#121a33;
+      --card2:#0f1730;
+      --text:#e9eeff;
+      --muted:#b9c2e6;
+      --ring: rgba(120, 150, 255, .35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 10% 10%, #1b2a62 0%, var(--bg) 60%) fixed;
+      color:var(--text);
+      min-height:100vh;
+    }
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:28px 18px 64px;
+    }
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:18px;
+    }
+    h1{
+      margin:0;
+      font-size:28px;
+      letter-spacing:.2px;
+    }
+    .sub{
+      margin:6px 0 0;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .add-btn{
+      width:54px;
+      height:54px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.14);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+      color:var(--text);
+      font-size:28px;
+      font-weight:700;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      box-shadow: 0 14px 30px rgba(0,0,0,.25);
+      transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+    .add-btn:hover{ transform: translateY(-1px); border-color: rgba(160,190,255,.35); box-shadow: 0 18px 40px rgba(0,0,0,.32);}    
+    .add-btn:active{ transform: translateY(0px) scale(.98);}    
+    .add-btn:focus-visible{ outline:none; box-shadow: 0 0 0 4px var(--ring), 0 18px 40px rgba(0,0,0,.32);}    
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap:14px;
+      margin-top:18px;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      padding:14px;
+      box-shadow: 0 12px 26px rgba(0,0,0,.25);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height:240px;
+    }
+
+    .photo{
+      width:100%;
+      aspect-ratio: 1 / 1;
+      border-radius:18px;
+      background:
+        radial-gradient(100px 100px at 25% 25%, rgba(255,255,255,.14), rgba(255,255,255,0) 60%),
+        linear-gradient(180deg, rgba(120,150,255,.25), rgba(80,110,255,.08));
+      border:1px solid rgba(255,255,255,.10);
+      overflow:hidden;
+      position:relative;
+    }
+    .photo img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
+    .name{
+      font-size:16px;
+      font-weight:700;
+      letter-spacing:.2px;
+      margin:0;
+      line-height:1.2;
+    }
+    .meta{
+      margin:0;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .empty{
+      margin-top:14px;
+      padding:18px;
+      border:1px dashed rgba(255,255,255,.22);
+      border-radius:22px;
+      color:var(--muted);
+      background: rgba(255,255,255,.03);
+    }
+
+    /* Modal */
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:50;
+    }
+    .modal{
+      width:min(520px, 100%);
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:24px;
+      box-shadow: 0 24px 70px rgba(0,0,0,.45);
+      overflow:hidden;
+    }
+    .modal header{
+      padding:16px 16px 0;
+      margin:0;
+      justify-content:space-between;
+    }
+    .modal h2{ margin:0; font-size:18px; }
+    .modal .content{ padding:16px; display:grid; gap:12px; }
+
+    .row{ display:grid; gap:8px; }
+    label{ font-size:12px; color:var(--muted); }
+    input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(15, 23, 48, .7);
+      color:var(--text);
+      outline:none;
+    }
+    input:focus{ box-shadow: 0 0 0 4px var(--ring); border-color: rgba(160,190,255,.35);}    
+
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      padding: 0 16px 16px;
+    }
+    .btn{
+      padding:10px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      cursor:pointer;
+      font-weight:700;
+    }
+    .btn.primary{
+      background: linear-gradient(180deg, rgba(120,150,255,.35), rgba(120,150,255,.18));
+      border-color: rgba(160,190,255,.35);
+    }
+    .btn:focus-visible{ outline:none; box-shadow: 0 0 0 4px var(--ring);}    
+
+    .hint{ font-size:12px; color:var(--muted); margin:0; }
+
+    @media (prefers-reduced-motion: reduce){
+      .add-btn{ transition:none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Classroom</h1>
+        <p class="sub">Tap + to add a new card with a picture and a name.</p>
+      </div>
+      <button class="add-btn" id="addBtn" aria-label="Add card" title="Add card">+</button>
+    </header>
+
+    <div id="emptyState" class="empty">
+      No cards yet. Click <b>+</b> to add the first student.
+    </div>
+
+    <main id="grid" class="grid" aria-label="Cards"></main>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <header>
+        <h2 id="modalTitle">Add to Classroom</h2>
+        <button class="btn" id="closeBtn" aria-label="Close">✕</button>
+      </header>
+      <div class="content">
+        <div class="row">
+          <label for="nameInput">Name</label>
+          <input id="nameInput" type="text" placeholder="e.g., Amina" maxlength="40" />
+        </div>
+        <div class="row">
+          <label for="imgInput">Upload Picture</label>
+          <input id="imgInput" type="file" accept="image/*" />
+          <p class="hint">Choose an image from your computer. Leave empty to use a built-in placeholder.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="cancelBtn">Cancel</button>
+        <button class="btn primary" id="createBtn">Add card</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const emptyState = document.getElementById('emptyState');
+
+    const addBtn = document.getElementById('addBtn');
+    const backdrop = document.getElementById('backdrop');
+    const closeBtn = document.getElementById('closeBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const createBtn = document.getElementById('createBtn');
+    const nameInput = document.getElementById('nameInput');
+    const imgInput = document.getElementById('imgInput');
+
+    // A tiny inline SVG placeholder (no external dependencies)
+    const placeholderSvg = (label) =>
+      'data:image/svg+xml;charset=UTF-8,' +
+      encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="600" height="600">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#6ea8ff" stop-opacity="0.45"/>
+              <stop offset="1" stop-color="#2b3cff" stop-opacity="0.18"/>
+            </linearGradient>
+          </defs>
+          <rect width="600" height="600" fill="url(#g)"/>
+          <circle cx="300" cy="255" r="95" fill="rgba(255,255,255,0.28)"/>
+          <path d="M140 520c30-110 130-150 160-150s130 40 160 150" fill="rgba(255,255,255,0.22)"/>
+          <text x="300" y="90" text-anchor="middle" font-family="ui-sans-serif, system-ui" font-size="28" fill="rgba(255,255,255,0.85)">${label}</text>
+        </svg>
+      `);
+
+    function setEmptyState() {
+      emptyState.style.display = grid.children.length ? 'none' : 'block';
+    }
+
+    function openModal() {
+      backdrop.style.display = 'flex';
+      nameInput.value = '';
+      imgInput.value = '';
+      // focus name for quick entry
+      setTimeout(() => nameInput.focus(), 0);
+    }
+
+    function closeModal() {
+      backdrop.style.display = 'none';
+      addBtn.focus();
+    }
+
+    function addCard({ name, file }) {
+      const card = document.createElement('section');
+      card.className = 'card';
+
+      const photo = document.createElement('div');
+      photo.className = 'photo';
+
+      const img = document.createElement('img');
+      img.alt = name ? `${name}'s photo` : 'Student photo';
+
+      if (file) {
+        const objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
+      } else {
+        img.src = placeholderSvg(name || 'Student');
+      }
+
+      img.loading = 'lazy';
+
+      photo.appendChild(img);
+
+      const title = document.createElement('p');
+      title.className = 'name';
+      title.textContent = name || 'Unnamed';
+
+      const meta = document.createElement('p');
+      meta.className = 'meta';
+      meta.textContent = 'Classroom';
+
+      card.append(photo, title, meta);
+      grid.prepend(card);
+      setEmptyState();
+    }
+
+    function onCreate() {
+      const name = nameInput.value.trim();
+      const file = imgInput.files && imgInput.files[0] ? imgInput.files[0] : null;
+      addCard({ name, file });
+      closeModal();
+    }
+
+    // Events
+    addBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (backdrop.style.display === 'flex' && e.key === 'Escape') closeModal();
+      if (backdrop.style.display === 'flex' && e.key === 'Enter') onCreate();
+    });
+
+    createBtn.addEventListener('click', onCreate);
+
+    // Start
+    setEmptyState();
+  </script>
+</body>
+</html>
