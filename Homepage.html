@@ -339,6 +339,17 @@
 
     // Start
     setEmptyState();
+
+     // Override addCard to also save
+    const originalAddCard = addCard;
+    addCard = function(data) {
+      originalAddCard(data);
+      saveToStorage();
+    };
+
+    // Start
+    loadFromStorage();
+    setEmptyState();
   </script>
 </body>
 </html>
